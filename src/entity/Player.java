@@ -9,83 +9,88 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Objects;
 
-public class Player extends Entity{
+public class Player extends Entity {
     GamePanel gp;
     KeyHandler keyH;
+
+    public final int screenX;
+    public final int screenY;
+
+    // Sprite arrays for each direction (2 frames per direction)
+    private final BufferedImage[] upSprites = new BufferedImage[2];
+    private final BufferedImage[] downSprites = new BufferedImage[2];
+    private final BufferedImage[] leftSprites = new BufferedImage[2];
+    private final BufferedImage[] rightSprites = new BufferedImage[2];
 
     public Player(GamePanel gp, KeyHandler keyH) {
         this.gp = gp;
         this.keyH = keyH;
+        screenX = gp.screenWidth/2 - (gp.tileSize/2);
+        screenY = gp.screenHeight/2 - (gp.tileSize/2);
         setDefaultValues();
         getPlayerImage();
     }
 
     public void setDefaultValues() {
-        x = 100;
-        y = 100;
+        worldX = gp.tileSize * 23;
+        worldY = gp.tileSize * 21;
         speed = 4;
         direction = "down";
+        spriteNum = 0; // 0-indexed (0 or 1)
     }
 
     public void getPlayerImage() {
         try {
-            up1 = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_up_1.png")));
-            up2 = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_up_2.png")));
-            down1 = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_down_1.png")));
-            down2 = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_down_2.png")));
-            left1 = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_left_1.png")));
-            left2 = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_left_2.png")));
-            right1 = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_right_1.png")));
-            right2 = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_right_2.png")));
+            for (int i = 0; i < 2; i++) {
+                int frameNum = i + 1; // Maps index 0 -> "1", index 1 -> "2"
+                upSprites[i]    = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_up_" + frameNum + ".png")));
+                downSprites[i]  = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_down_" + frameNum + ".png")));
+                leftSprites[i]  = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_left_" + frameNum + ".png")));
+                rightSprites[i] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_right_" + frameNum + ".png")));
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     public void update() {
-        if(keyH.upPressed) {
+        boolean isMoving = keyH.upPressed || keyH.downPressed || keyH.leftPressed || keyH.rightPressed;
+
+        if (keyH.upPressed) {
             direction = "up";
-            y -= speed;
-        } else if(keyH.downPressed) {
+            worldY -= speed;
+        } else if (keyH.downPressed) {
             direction = "down";
-            y += speed;
-        } else if(keyH.leftPressed) {
+            worldY += speed;
+        } else if (keyH.leftPressed) {
             direction = "left";
-            x -= speed;
-        } else if(keyH.rightPressed) {
+            worldX -= speed;
+        } else if (keyH.rightPressed) {
             direction = "right";
-            x += speed;
+            worldX += speed;
+        }
+
+        // Animate only when moving
+        if (isMoving) {
+            spriteCounter++;
+            if (spriteCounter > 10) {
+                spriteNum = (spriteNum + 1) % 2; // Toggles between index 0 and 1
+                spriteCounter = 0;
+            }
+        } else {
+            spriteNum = 0; // Reset to standing frame when stationary
         }
     }
 
     public void draw(Graphics2D g2) {
-//        g2.setColor(Color.white);
-//        g2.fillRect(x, y, gp.tileSize, gp.tileSize);
-
         BufferedImage image = switch (direction) {
-            case "up" -> switch (spriteNum) {
-                case 1 -> up1;
-                case 2 -> up2;
-                default -> null;
-            };
-            case "down" -> switch (spriteNum) {
-                case 1 -> down1;
-                case 2 -> down2;
-                default -> null;
-            };
-            case "left" -> switch (spriteNum) {
-                case 1 -> left1;
-                case 2 -> left2;
-                default -> null;
-            };
-            case "right" -> switch (spriteNum) {
-                case 1 -> right1;
-                case 2 -> right2;
-                default -> null;
-            };
-            default -> null;
+            case "up"    -> upSprites[spriteNum];
+            case "down"  -> downSprites[spriteNum];
+            case "left"  -> leftSprites[spriteNum];
+            case "right" -> rightSprites[spriteNum];
+            default      -> downSprites[0];
         };
 
-        g2.drawImage(image, x, y, gp.tileSize, gp.tileSize, null);
+        g2.drawImage(image, screenX, screenY, gp.tileSize, gp.tileSize, null);
     }
 }
