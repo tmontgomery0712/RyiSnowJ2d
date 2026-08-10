@@ -16,6 +16,9 @@ public class Player extends Entity {
     public final int screenX;
     public final int screenY;
 
+    // Precalculated diagonal speed for performance
+    private int diagonalSpeed;
+
     // Sprite arrays for each direction (2 frames per direction)
     private final BufferedImage[] upSprites = new BufferedImage[2];
     private final BufferedImage[] downSprites = new BufferedImage[2];
@@ -25,8 +28,9 @@ public class Player extends Entity {
     public Player(GamePanel gp, KeyHandler keyH) {
         this.gp = gp;
         this.keyH = keyH;
-        screenX = gp.screenWidth/2 - (gp.tileSize/2);
-        screenY = gp.screenHeight/2 - (gp.tileSize/2);
+        screenX = gp.screenWidth / 2 - (gp.tileSize / 2);
+        screenY = gp.screenHeight / 2 - (gp.tileSize / 2);
+        solidArea = new Rectangle(10, 16, 28, 32);
         setDefaultValues();
         getPlayerImage();
     }
@@ -35,14 +39,16 @@ public class Player extends Entity {
         worldX = gp.tileSize * 23;
         worldY = gp.tileSize * 21;
         speed = 4;
+        // Precompute diagonal speed (4 / 1.4142 ≈ 2.83 -> rounds to 3)
+        diagonalSpeed = (int) Math.round(speed / 1.41421356);
         direction = "down";
-        spriteNum = 0; // 0-indexed (0 or 1)
+        spriteNum = 0;
     }
 
     public void getPlayerImage() {
         try {
             for (int i = 0; i < 2; i++) {
-                int frameNum = i + 1; // Maps index 0 -> "1", index 1 -> "2"
+                int frameNum = i + 1;
                 upSprites[i]    = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_up_" + frameNum + ".png")));
                 downSprites[i]  = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_down_" + frameNum + ".png")));
                 leftSprites[i]  = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_left_" + frameNum + ".png")));
@@ -54,31 +60,58 @@ public class Player extends Entity {
     }
 
     public void update() {
-        boolean isMoving = keyH.upPressed || keyH.downPressed || keyH.leftPressed || keyH.rightPressed;
+        boolean movingY = keyH.upPressed || keyH.downPressed;
+        boolean movingX = keyH.leftPressed || keyH.rightPressed;
 
-        if (keyH.upPressed) {
-            direction = "up";
-            worldY -= speed;
-        } else if (keyH.downPressed) {
-            direction = "down";
-            worldY += speed;
-        } else if (keyH.leftPressed) {
-            direction = "left";
-            worldX -= speed;
-        } else if (keyH.rightPressed) {
-            direction = "right";
-            worldX += speed;
-        }
+        if (movingY || movingX) {
+            // 1. Facing direction (horizontal priority during diagonal move)
+            if (keyH.leftPressed) {
+                direction = "left";
+            } else if (keyH.rightPressed) {
+                direction = "right";
+            } else if (keyH.upPressed) {
+                direction = "up";
+            } else if (keyH.downPressed) {
+                direction = "down";
+            }
 
-        // Animate only when moving
-        if (isMoving) {
+            // 2. Select movement speed
+            int moveSpeed = (movingY && movingX) ? diagonalSpeed : speed;
+
+            // 3. Handle Vertical Movement
+            if (keyH.upPressed) {
+                gp.collissionChecker.checkTile(this, "up");
+                if (!collisionOn) {
+                    worldY -= moveSpeed;
+                }
+            } else if (keyH.downPressed) {
+                gp.collissionChecker.checkTile(this, "down");
+                if (!collisionOn) {
+                    worldY += moveSpeed;
+                }
+            }
+
+            // 4. Handle Horizontal Movement
+            if (keyH.leftPressed) {
+                gp.collissionChecker.checkTile(this, "left");
+                if (!collisionOn) {
+                    worldX -= moveSpeed;
+                }
+            } else if (keyH.rightPressed) {
+                gp.collissionChecker.checkTile(this, "right");
+                if (!collisionOn) {
+                    worldX += moveSpeed;
+                }
+            }
+
+            // 5. Update animation frame
             spriteCounter++;
             if (spriteCounter > 10) {
-                spriteNum = (spriteNum + 1) % 2; // Toggles between index 0 and 1
+                spriteNum = (spriteNum + 1) % 2;
                 spriteCounter = 0;
             }
         } else {
-            spriteNum = 0; // Reset to standing frame when stationary
+            spriteNum = 0;
         }
     }
 
@@ -91,6 +124,11 @@ public class Player extends Entity {
             default      -> downSprites[0];
         };
 
+        // Render player sprite
         g2.drawImage(image, screenX, screenY, gp.tileSize, gp.tileSize, null);
+
+        // Render solidArea collision box overlay (Red outline)
+        g2.setColor(Color.RED);
+        g2.drawRect(screenX + solidArea.x, screenY + solidArea.y, solidArea.width, solidArea.height);
     }
 }
