@@ -2,6 +2,7 @@ package entity;
 
 import main.GamePanel;
 import main.KeyHandler;
+import main.UtilityTool;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -16,10 +17,8 @@ public class Player extends Entity {
     public final int screenX;
     public final int screenY;
 
-    // Precalculated diagonal speed for performance
     private int diagonalSpeed;
 
-    // Sprite arrays for each direction (2 frames per direction)
     private final BufferedImage[] upSprites = new BufferedImage[2];
     private final BufferedImage[] downSprites = new BufferedImage[2];
     private final BufferedImage[] leftSprites = new BufferedImage[2];
@@ -39,24 +38,30 @@ public class Player extends Entity {
         worldX = gp.tileSize * 23;
         worldY = gp.tileSize * 21;
         speed = 4;
-        // Precompute diagonal speed (4 / 1.4142 ≈ 2.83 -> rounds to 3)
         diagonalSpeed = (int) Math.round(speed / 1.41421356);
-        direction = "down";
+        direction = DirectionEnum.DOWN;
         spriteNum = 0;
     }
 
     public void getPlayerImage() {
+        for (int i = 0; i < 2; i++) {
+            int frameNum = i + 1;
+            upSprites[i] = setupSprite("/player/boy_up_" + frameNum + ".png");
+            downSprites[i] = setupSprite("/player/boy_down_" + frameNum + ".png");
+            leftSprites[i] = setupSprite("/player/boy_left_" + frameNum + ".png");
+            rightSprites[i] = setupSprite("/player/boy_right_" + frameNum + ".png");
+        }
+    }
+
+    private BufferedImage setupSprite(String imagePath) {
+        BufferedImage image = null;
         try {
-            for (int i = 0; i < 2; i++) {
-                int frameNum = i + 1;
-                upSprites[i]    = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_up_" + frameNum + ".png")));
-                downSprites[i]  = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_down_" + frameNum + ".png")));
-                leftSprites[i]  = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_left_" + frameNum + ".png")));
-                rightSprites[i] = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/player/boy_right_" + frameNum + ".png")));
-            }
+            image = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream(imagePath)));
+            image = UtilityTool.scaleImage(image, gp.tileSize, gp.tileSize);
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return image;
     }
 
     public void update() {
@@ -64,47 +69,50 @@ public class Player extends Entity {
         boolean movingX = keyH.leftPressed || keyH.rightPressed;
 
         if (movingY || movingX) {
-            // 1. Facing direction (horizontal priority during diagonal move)
             if (keyH.leftPressed) {
-                direction = "left";
+                direction = DirectionEnum.LEFT;
             } else if (keyH.rightPressed) {
-                direction = "right";
+                direction = DirectionEnum.RIGHT;
             } else if (keyH.upPressed) {
-                direction = "up";
+                direction = DirectionEnum.UP;
             } else if (keyH.downPressed) {
-                direction = "down";
+                direction = DirectionEnum.DOWN;
             }
 
-            // 2. Select movement speed
-            int moveSpeed = (movingY && movingX) ? diagonalSpeed : speed;
-
-            // 3. Handle Vertical Movement
+            // Check Y axis
+            boolean clearY = true;
             if (keyH.upPressed) {
-                gp.collissionChecker.checkTile(this, "up");
-                if (!collisionOn) {
-                    worldY -= moveSpeed;
-                }
+                gp.collisionChecker.checkTile(this, DirectionEnum.UP);
+                if (collisionOn) clearY = false;
             } else if (keyH.downPressed) {
-                gp.collissionChecker.checkTile(this, "down");
-                if (!collisionOn) {
-                    worldY += moveSpeed;
-                }
+                gp.collisionChecker.checkTile(this, DirectionEnum.DOWN);
+                if (collisionOn) clearY = false;
             }
 
-            // 4. Handle Horizontal Movement
+            // Check X axis
+            boolean clearX = true;
             if (keyH.leftPressed) {
-                gp.collissionChecker.checkTile(this, "left");
-                if (!collisionOn) {
-                    worldX -= moveSpeed;
-                }
+                gp.collisionChecker.checkTile(this, DirectionEnum.LEFT);
+                if (collisionOn) clearX = false;
             } else if (keyH.rightPressed) {
-                gp.collissionChecker.checkTile(this, "right");
-                if (!collisionOn) {
-                    worldX += moveSpeed;
-                }
+                gp.collisionChecker.checkTile(this, DirectionEnum.RIGHT);
+                if (collisionOn) clearX = false;
             }
 
-            // 5. Update animation frame
+            // Apply Y movement
+            if (clearY) {
+                int ySpeed = (movingY && movingX && clearX) ? diagonalSpeed : speed;
+                if (keyH.upPressed) worldY -= ySpeed;
+                else if (keyH.downPressed) worldY += ySpeed;
+            }
+
+            // Apply X movement
+            if (clearX) {
+                int xSpeed = (movingY && movingX && clearY) ? diagonalSpeed : speed;
+                if (keyH.leftPressed) worldX -= xSpeed;
+                else if (keyH.rightPressed) worldX += xSpeed;
+            }
+
             spriteCounter++;
             if (spriteCounter > 10) {
                 spriteNum = (spriteNum + 1) % 2;
@@ -117,17 +125,15 @@ public class Player extends Entity {
 
     public void draw(Graphics2D g2) {
         BufferedImage image = switch (direction) {
-            case "up"    -> upSprites[spriteNum];
-            case "down"  -> downSprites[spriteNum];
-            case "left"  -> leftSprites[spriteNum];
-            case "right" -> rightSprites[spriteNum];
-            default      -> downSprites[0];
+            case UP -> upSprites[spriteNum];
+            case DOWN -> downSprites[spriteNum];
+            case LEFT -> leftSprites[spriteNum];
+            case RIGHT -> rightSprites[spriteNum];
         };
 
-        // Render player sprite
-        g2.drawImage(image, screenX, screenY, gp.tileSize, gp.tileSize, null);
+        // Draw unscaled image
+        g2.drawImage(image, screenX, screenY, null);
 
-        // Render solidArea collision box overlay (Red outline)
         g2.setColor(Color.RED);
         g2.drawRect(screenX + solidArea.x, screenY + solidArea.y, solidArea.width, solidArea.height);
     }

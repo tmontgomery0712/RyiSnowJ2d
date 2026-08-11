@@ -12,8 +12,8 @@ public class GamePanel extends JPanel implements Runnable {
     final int originalTileSize = 16; //16x16 tile size
     final int scale = 3;
     public final int tileSize = originalTileSize * scale; //48x48 tile size
-    public final int maxScreenCol = 10;
-    public final int maxScreenRow = 6;
+    public final int maxScreenCol = 16;
+    public final int maxScreenRow = 12;
     public final int screenWidth = tileSize * maxScreenCol; //768 pixels
     public final int screenHeight = tileSize * maxScreenRow; //576 pixels
 
@@ -26,7 +26,7 @@ public class GamePanel extends JPanel implements Runnable {
     TileManager tileManager = new TileManager(this);
     KeyHandler keyH = new KeyHandler();
     Thread gameThread;
-    public CollissionChecker collissionChecker = new CollissionChecker(this);
+    public CollisionChecker collisionChecker = new CollisionChecker(this);
     public Player player = new Player(this, this.keyH);
 
     public GamePanel() {
@@ -58,6 +58,13 @@ public class GamePanel extends JPanel implements Runnable {
                 update();
                 repaint();
                 delta--;
+            } else {
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
     }
