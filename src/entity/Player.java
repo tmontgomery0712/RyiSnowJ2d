@@ -14,8 +14,8 @@ public class Player extends Entity {
     GamePanel gp;
     KeyHandler keyH;
 
-    public final int screenX;
-    public final int screenY;
+    public int screenX;
+    public int screenY;
 
     private int diagonalSpeed;
 
@@ -120,6 +120,25 @@ public class Player extends Entity {
             }
         } else {
             spriteNum = 0;
+        }
+
+        // --- CAMERA BOUNDARY LOGIC ---
+        // 1. Default to keeping the player in the center of the screen
+        screenX = gp.screenWidth / 2 - (gp.tileSize / 2);
+        screenY = gp.screenHeight / 2 - (gp.tileSize / 2);
+
+        // 2. Lock camera if approaching the Left or Right edge of the map
+        if (worldX < screenX) {
+            screenX = worldX;
+        } else if (gp.screenWidth - screenX > gp.worldWidth - worldX) {
+            screenX = gp.screenWidth - (gp.worldWidth - worldX);
+        }
+
+        // 3. Lock camera if approaching the Top or Bottom edge of the map
+        if (worldY < screenY) {
+            screenY = worldY;
+        } else if (gp.screenHeight - screenY > gp.worldHeight - worldY) {
+            screenY = gp.screenHeight - (gp.worldHeight - worldY);
         }
     }
 
